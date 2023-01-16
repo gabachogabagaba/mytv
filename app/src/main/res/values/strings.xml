@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">test</string>
+    <string name="title_activity_player">PlayerActivity</string>
+    <string name="state">state</string>
+</resources>

@@ -1,0 +1,49 @@
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <PreferenceCategory
+        app:key="preferenceCategory"
+        app:title="Streamer"/>
+        <EditTextPreference
+            app:key="streamer_ip_address"
+            app:title="IP address"/>
+        <EditTextPreference
+            app:key="streamer_port"
+            app:title="HTTP port"/>
+    <PreferenceCategory
+        app:key="lircCategory"
+        app:title="LIRC"/>
+    <EditTextPreference
+        app:key="lirc_ip_address"
+        app:title="IP address"/>
+    <EditTextPreference
+        app:key="lirc_port"
+        app:title="Port"/>
+    <EditTextPreference
+        app:key="lirc_remote_name"
+        app:title="Remote name"/>
+    <EditTextPreference
+        app:key="lirc_power_button_name"
+        app:title="Remote power button name"/>
+    <EditTextPreference
+        app:key="lirc_chup_name"
+        app:title="CH+ button name"/>
+    <EditTextPreference
+        app:key="lirc_chdn_name"
+        app:title="CH- button name"/>
+
+    <PreferenceCategory
+        app:key="playbackCategory"
+        app:title="Playback"/>
+    <EditTextPreference
+        app:key="latency_target"
+        app:title="Latency target (ms)"/>
+    <CheckBoxPreference
+        app:key="stream_info"
+        app:title="Stream info over video"/>
+    <PreferenceCategory
+        app:key="miscCategory"
+        app:title="Misc"/>
+    <CheckBoxPreference
+        app:key="auto_power"
+        app:title="Auto power"/>
+</PreferenceScreen>
