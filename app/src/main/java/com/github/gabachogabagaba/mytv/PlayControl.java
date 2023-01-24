@@ -11,12 +11,12 @@ import android.view.View;
 import java.util.Timer;
 import java.util.TimerTask;
 
-
 public class PlayControl extends HandlerThread {
     static final int MSG_ON_PAUSE = 0;
     static final int MSG_ON_RESUME = 1;
     static final int MSG_ON_STOP = 2;
     static final int MSG_ON_DESTROY = 2;
+    static final int MSG_TOGGLE_STATUS = 3;
     final String TAG = "PlayControl";
     private Handler mainHandler;
     EncoderControl encoderControl;
@@ -25,7 +25,7 @@ public class PlayControl extends HandlerThread {
     Context context;
     PlayActivity playActivity;
     PlayControlPrintStatus playControlPrintStatus;
-    Timer timerPlayControlStatus;
+    Timer timerPlayControlStatus = null;
     boolean boolPrintStatus = false;
     boolean autoPower = false;
     String lircRemoteName;
@@ -43,8 +43,6 @@ public class PlayControl extends HandlerThread {
         lirc = new Lirc("Lirc", lircAddress, lircPort);
         this.context = context;
         playActivity = (PlayActivity)context;
-        playControlPrintStatus = new PlayControlPrintStatus();
-        timerPlayControlStatus = new Timer();
         this.boolPrintStatus = boolPrintStatus;
         this.autoPower = autoPower;
         this.lircRemoteName = lircRemoteName;
@@ -86,7 +84,7 @@ public class PlayControl extends HandlerThread {
                 exoControl.start();
 //                    Start status printing
                 if (boolPrintStatus) {
-                    timerPlayControlStatus.schedule(playControlPrintStatus, 1000, 1000);
+                    enablePrintStatus();
                 }
             }
 
@@ -110,7 +108,32 @@ public class PlayControl extends HandlerThread {
                 encoderControl.setEncoderState(false);
                 getLooper().quit();
             }
+            if(msg.what == MSG_TOGGLE_STATUS){
+                togglePrintStatus();
+            }
         }
+    }
+
+    public void togglePrintStatus(){
+        boolPrintStatus = !boolPrintStatus;
+        if(boolPrintStatus){
+            enablePrintStatus();
+        }
+        else{
+            disablePrintStatus();
+        }
+    }
+    private void enablePrintStatus(){
+        playControlPrintStatus = new PlayControlPrintStatus();
+        timerPlayControlStatus = new Timer("PlayControlStatus");
+        timerPlayControlStatus.schedule(playControlPrintStatus, 0, 1000);
+    }
+
+    private void disablePrintStatus(){
+        timerPlayControlStatus.cancel();
+        timerPlayControlStatus = null;
+        playControlPrintStatus = null;
+        playActivity.printStatus("");
     }
 
     private void lircStop() {
@@ -158,10 +181,10 @@ public class PlayControl extends HandlerThread {
             ExoControlStatus exoControlStatus;
             exoControlStatus = exoControl.getStatus();
             if(exoControlStatus != null){
-                str = String.format("\n\n Offset: %d ms\n Offset error: %d ms\n Speed %.2f\n Video: %s, %d x %d, %.0f fps, %d kbps\n Audio: %s, %d Hz, %d kbps",
+                str = String.format("\n\n Offset: %d ms\n Offset error: %d ms\n Speed %.2f\n %s\n %s",
                         exoControlStatus.offset, exoControlStatus.offsetError, exoControlStatus.speed,
-                        exoControlStatus.videoFormat.codecs, exoControlStatus.videoFormat.width, exoControlStatus.videoFormat.height, exoControlStatus.videoFormat.frameRate,exoControlStatus.videoFormat.bitrate,
-                        exoControlStatus.audioFormat.codecs, exoControlStatus.audioFormat.sampleRate,exoControlStatus.audioFormat.bitrate);
+                        exoControlStatus.videoFormat.toString(),
+                        exoControlStatus.audioFormat.toString());
                 playActivity.printStatus(str);
             }
         }
