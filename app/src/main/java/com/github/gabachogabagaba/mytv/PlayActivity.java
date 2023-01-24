@@ -81,8 +81,6 @@ public class PlayActivity extends AppCompatActivity {
         super.onStop();
         Log.d(TAG, "onStop();");
 
-        playControl.onStop();
-
         Log.d(TAG, "Stopping PlayerControl thread.");
         try {
             playControl.join();
@@ -111,6 +109,8 @@ public class PlayActivity extends AppCompatActivity {
         this.conf_lirc_port = Integer.parseInt(prefs.getString("lirc_port", "8765"));
         this.encoderURL = String.format("http://%s:%d", this.conf_streamer_ip_address, this.conf_streamer_http_port);
         this.mediaURL = String.format("http://%s:%d/%s", this.conf_streamer_ip_address, this.conf_streamer_http_port, this.mediaPath);
+//        this.mediaURL = String.format("http://%s/hls/stream0.m3u8", this.conf_streamer_ip_address);
+//        this.mediaURL = String.format("rtsp://%s/stream0", this.conf_streamer_ip_address);
         this.conf_lirc_remote_name = prefs.getString("lirc_remote_name", "");
         this.conf_lirc_power_button_name = prefs.getString("lirc_power_button_name", "");
         this.conf_latency_target = Integer.parseInt(prefs.getString("latency_target", "200"));
@@ -118,7 +118,7 @@ public class PlayActivity extends AppCompatActivity {
         this.conf_auto_power = prefs.getBoolean("auto_power", false);
         this.conf_lirc_chup_name = prefs.getString("lirc_chup_name",  "");
         this.conf_lirc_chdn_name = prefs.getString("lirc_chdn_name",  "");
-        playControl = new PlayControl(encoderURL, mediaURL, conf_lirc_ip_address, conf_lirc_port, conf_latency_target, conf_auto_power, this.conf_lirc_remote_name, this.conf_lirc_power_button_name, this.conf_lirc_chup_name, this.conf_lirc_chdn_name, findViewById(R.id.idExoPlayerVIew), handler, conf_stream_info, this);
+        playControl = new PlayControl("PlayControl", encoderURL, mediaURL, conf_lirc_ip_address, conf_lirc_port, conf_latency_target, conf_auto_power, this.conf_lirc_remote_name, this.conf_lirc_power_button_name, this.conf_lirc_chup_name, this.conf_lirc_chdn_name, findViewById(R.id.idExoPlayerVIew), handler, conf_stream_info, this);
         playControl.start();
 // Wait for the playControl's message handler to be ready after the thread start
         while(playControl.isHandlerReady() == false) {

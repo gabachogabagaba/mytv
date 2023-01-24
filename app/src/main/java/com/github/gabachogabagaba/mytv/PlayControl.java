@@ -2,6 +2,7 @@ package com.github.gabachogabagaba.mytv;
 
 import android.content.Context;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
@@ -11,8 +12,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 
-public class PlayControl extends Thread {
-    public Handler handler;
+public class PlayControl extends HandlerThread {
     static final int MSG_ON_PAUSE = 0;
     static final int MSG_ON_RESUME = 1;
     static final int MSG_ON_STOP = 2;
@@ -32,14 +32,15 @@ public class PlayControl extends Thread {
     String lircPowerButtonName;
     String lircChUpName;
     String lircChDnName;
-    boolean handlerReady = false;
+    PlayControlHandler mHandler = null;
 
-    PlayControl(String encoderURL, String mediaURL, String lircAddress, int lircPort, int latencyTarget, boolean autoPower, String lircRemoteName, String lircPowerButtonName, String lircChUpName, String lircChDnName, View view, Handler mainHandler, boolean boolPrintStatus, Context context) {
+    PlayControl(String name, String encoderURL, String mediaURL, String lircAddress, int lircPort, int latencyTarget, boolean autoPower, String lircRemoteName, String lircPowerButtonName, String lircChUpName, String lircChDnName, View view, Handler mainHandler, boolean boolPrintStatus, Context context) {
+        super(name);
         encoderControl = new EncoderControl(encoderURL);
         exoControl = new ExoControl(mediaURL, latencyTarget, view, mainHandler, context);
 
         this.mainHandler = mainHandler;
-        lirc = new Lirc(lircAddress, lircPort);
+        lirc = new Lirc("Lirc", lircAddress, lircPort);
         this.context = context;
         playActivity = (PlayActivity)context;
         playControlPrintStatus = new PlayControlPrintStatus();
@@ -50,71 +51,75 @@ public class PlayControl extends Thread {
         this.lircPowerButtonName = lircPowerButtonName;
         this.lircChUpName = lircChUpName;
         this.lircChDnName = lircChDnName;
-        handlerReady = false;
     }
 
     @Override
-    public void run() {
-        Looper.prepare();
+    protected void onLooperPrepared() {
+        super.onLooperPrepared();
+        mHandler = new PlayControlHandler(getLooper());
+    }
 
-        handler = new Handler() {
-            @Override
-            public void handleMessage(Message msg){
-                if(msg.what == MSG_ON_RESUME){
-                    Log.d(TAG, "handling MSG_ON_RESUME");
-                    lirc.start();
+    private class PlayControlHandler extends Handler {
+        public PlayControlHandler(Looper looper){
+            super(looper);
+        }
+        public void handleMessage(Message msg) {
+            if (msg.what == MSG_ON_RESUME) {
+                Log.d(TAG, "handling MSG_ON_RESUME");
+                lirc.start();
 //                    Start the encoder
-                    encoderControl.setEncoderState(true);
+                encoderControl.setEncoderState(true);
 
-                    if(autoPower) {
-                        // Start the lirc client
-                        lirc.connect();
-                        // If encder's HDMI input is not active send an IR power command once.
-                        if (!encoderControl.getInputState()) {
-                            Log.d(TAG, "HDMI state: no signal");
-                            LircData lircData = new LircData();
-                            lircData.remote = lircRemoteName;
-                            lircData.button = lircPowerButtonName;
-                            lirc.send(lircData);
-                        }
+                if (autoPower) {
+                    // Start the lirc client
+                    lirc.connect();
+                    // If encder's HDMI input is not active send an IR power command once.
+                    if (!encoderControl.getInputState()) {
+                        Log.d(TAG, "HDMI state: no signal");
+                        LircData lircData = new LircData();
+                        lircData.remote = lircRemoteName;
+                        lircData.button = lircPowerButtonName;
+                        lirc.send(lircData);
                     }
+                }
 //                    Start the playback.
-                    exoControl.start();
+                exoControl.start();
 //                    Start status printing
-                    if(boolPrintStatus) {
-                        timerPlayControlStatus.schedule(playControlPrintStatus, 1000, 1000);
-                    }
-                }
-
-                if(msg.what == MSG_ON_PAUSE) {
-//                    Stop the encoder
-                    if(boolPrintStatus) {
-                        timerPlayControlStatus.cancel();
-                    }
-                    exoControl.stop();
-                    if(autoPower) {
-                        //                  If HDMI input is up, send power command to the source to shut it down.
-                        if (encoderControl.getInputState()) {
-                            LircData lircData = new LircData();
-                            lircData.remote = lircRemoteName;
-                            lircData.button = lircPowerButtonName;
-                            lirc.send(lircData);
-                        }
-                        lirc.quit();
-                    }
-//                    Shutdown the encoder.
-                    encoderControl.setEncoderState(false);
-                }
-                if(msg.what == MSG_ON_STOP) {
-//                    Stop the thread
-                    handlerReady = false;
-                    Looper.myLooper().quit();
+                if (boolPrintStatus) {
+                    timerPlayControlStatus.schedule(playControlPrintStatus, 1000, 1000);
                 }
             }
-        };
-        handlerReady = true;
-        Looper.loop();
+
+            if (msg.what == MSG_ON_PAUSE) {
+//                    Stop the encoder
+                if (boolPrintStatus) {
+                    timerPlayControlStatus.cancel();
+                }
+                exoControl.stop();
+                if (autoPower) {
+                    //                  If HDMI input is up, send power command to the source to shut it down.
+                    if (encoderControl.getInputState()) {
+                        LircData lircData = new LircData();
+                        lircData.remote = lircRemoteName;
+                        lircData.button = lircPowerButtonName;
+                        lirc.send(lircData);
+                    }
+                    lircStop();
+                }
+//                    Shutdown the encoder.
+                encoderControl.setEncoderState(false);
+                getLooper().quit();
+            }
+        }
     }
+
+    private void lircStop() {
+        if (lirc != null) {
+            lirc.disconnect();
+            lirc = null;
+        }
+    }
+
     public void lircSend(String buttonName) {
         LircData lircData = new LircData();
         lircData.remote = lircRemoteName;
@@ -122,25 +127,19 @@ public class PlayControl extends Thread {
         lirc.send(lircData);
     }
     public boolean isHandlerReady() {
-        return handlerReady;
+        return mHandler != null;
     }
     public void onPause(){
         Message message = Message.obtain();
         message.what = MSG_ON_PAUSE;
         Log.d("PlayControl", "onPause()");
-        handler.sendMessage(message);
+        mHandler.sendMessage(message);
     }
     public void onResume(){
         Message message = Message.obtain();
         message.what = MSG_ON_RESUME;
         Log.d("PlayControl", "onResume()");
-        handler.sendMessage(message);
-    }
-    public void onStop(){
-        Message message = Message.obtain();
-        message.what = MSG_ON_STOP;
-        Log.d("PlayControl", "onStop()");
-        handler.sendMessage(message);
+        mHandler.sendMessage(message);
     }
 
     class PlayControlPrintStatus extends TimerTask {

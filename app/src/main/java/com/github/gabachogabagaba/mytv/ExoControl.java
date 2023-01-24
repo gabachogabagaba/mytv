@@ -44,42 +44,12 @@ public class ExoControl {
         Log.d(TAG, String.format("medialURL: %s", mediaURL));
 
         loadControl = new DefaultLoadControl.Builder()
-                .setBufferDurationsMs(500, 5000, 500, 500)
+                .setBufferDurationsMs(200, 5000, 200, 200)
                 .setPrioritizeTimeOverSizeThresholds(true)
                 .build();
 
-        renderersFactory = new DefaultRenderersFactory(context)
-                .setMediaCodecSelector(
-                        (mimeType, requiresSecureDecoder, requiresTunnelingDecoder) -> {
-                            boolean sec;
-                            if(mimeType == "video/hevc") {
-                                sec = false;
-                            }
-                            else{
-                                sec = requiresSecureDecoder;
-                            }
-                            List<MediaCodecInfo> codecs = MediaCodecSelector.DEFAULT.getDecoderInfos(
-                                    mimeType,
-//                                    requiresSecureDecoder,
-                                    sec,
-                                    requiresTunnelingDecoder
-                            );
-                            if (codecs.isEmpty()) {
-                                return Collections.emptyList();
-                            }
-                            // Only consider the first decoder, or iterate the list and select the decoder
-                            // that is hardwareAccelerated.
-                            for(MediaCodecInfo mediaCodecInfo : codecs){
-                                Log.d(TAG, mimeType + mediaCodecInfo.toString());
-                            }
-
-                            return Collections.singletonList(codecs.get(0));
-                        }
-                );
-
         exoPlayer = new ExoPlayer.Builder(context)
                 .setLoadControl(loadControl)
-                .setRenderersFactory(renderersFactory)
 //                .setMediaSourceFactory(
 //                new DefaultMediaSourceFactory(context).setLiveTargetOffsetMs(latencyTarget))
                 .build();
@@ -116,7 +86,8 @@ public class ExoControl {
             @Override
             public void run() {
                 timerOffsetControl.cancel();
-                exoPlayer.stop();
+                exoPlayer.release();
+                exoPlayer = null;
             }
         });
     }
