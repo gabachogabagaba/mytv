@@ -20,7 +20,7 @@
         <activity
             android:name="com.github.gabachogabagaba.mytv.PlayActivity"
             android:label="PlayActivity"
-            android:screenOrientation="userLandscape">
+            android:configChanges="orientation|screenSize|layoutDirection">
         </activity>
         <activity
             android:name="com.github.gabachogabagaba.mytv.PreferenceActivity"
