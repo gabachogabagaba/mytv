@@ -17,6 +17,7 @@ public class PlayControl extends HandlerThread {
     static final int MSG_ON_STOP = 2;
     static final int MSG_ON_DESTROY = 2;
     static final int MSG_TOGGLE_STATUS = 3;
+    static final int MSG_AUTOPOWER_PLAY = 4;
     final String TAG = "PlayControl";
     private Handler mainHandler;
     EncoderControl encoderControl;
@@ -58,6 +59,8 @@ public class PlayControl extends HandlerThread {
     }
 
     private class PlayControlHandler extends Handler {
+        HDMIPoll hdmiPoll = null;
+
         public PlayControlHandler(Looper looper){
             super(looper);
         }
@@ -67,6 +70,7 @@ public class PlayControl extends HandlerThread {
                 lirc.start();
 //                    Start the encoder
                 encoderControl.setEncoderState(true);
+                boolean playImmediate = true;
 
                 if (autoPower) {
                     // Start the lirc client
@@ -78,9 +82,27 @@ public class PlayControl extends HandlerThread {
                         lircData.remote = lircRemoteName;
                         lircData.button = lircPowerButtonName;
                         lirc.send(lircData);
+
+                        hdmiPoll = new HDMIPoll("HDMIPoll");
+                        hdmiPoll.setMessageHandler(this);
+                        hdmiPoll.start();
+
+                        playImmediate = false;
                     }
                 }
-//                    Start the playback.
+                if(playImmediate) {
+                    // Start the playback.
+                    exoControl.start();
+                    // Start status printing
+                    if (boolPrintStatus) {
+                        enablePrintStatus();
+                    }
+                }
+            }
+
+            if(msg.what == MSG_AUTOPOWER_PLAY){
+                Log.d(TAG, "MSG_AUTOPOWER_PLAY");
+                hdmiPoll = null;
                 exoControl.start();
 //                    Start status printing
                 if (boolPrintStatus) {
@@ -106,10 +128,81 @@ public class PlayControl extends HandlerThread {
                 }
 //                    Shutdown the encoder.
                 encoderControl.setEncoderState(false);
+                if(hdmiPoll != null){
+                    hdmiPoll.quit();
+                    hdmiPoll = null;
+                }
                 getLooper().quit();
             }
             if(msg.what == MSG_TOGGLE_STATUS){
                 togglePrintStatus();
+            }
+        }
+
+        class HDMIPoll extends Thread {
+            boolean doQuit = false;
+            Handler handler;
+
+            public HDMIPoll(String name) {
+                super(name);
+            }
+            @Override
+            public void run() {
+                int t = 0;
+                long tLastHDMIUp = -1;
+                long tNow;
+                int iMarker= 0;
+                final String[] marker = {"", "■"};
+                String msg;
+
+                while (true) {
+                    try {
+                        sleep(10);
+                    } catch (Exception e) {
+                    }
+                    t += 10;
+                    if(t % 300 == 0){
+                        msg = " Auto powering. HDMI: %s " + marker[iMarker];
+                        if(encoderControl.getInputState()) {
+                            tNow = System.nanoTime();
+                            Log.d(TAG, "HDMI up");
+                            playActivity.printStatus(String.format(msg, "up"));
+                            if(tLastHDMIUp < 0) {
+                                tLastHDMIUp = tNow;
+                            }
+//                            If HDMI is up continuously for seconds, HDMI is considered stable.
+                            doQuit = (tNow - tLastHDMIUp > 5e9);
+                            if(doQuit){
+                                Log.d(TAG, "HDMI stable");
+                                playActivity.printStatus("");
+                                Message message = Message.obtain();
+                                message.what = MSG_AUTOPOWER_PLAY;
+                                handler.sendMessage(message);
+                            }
+                        }
+                        else{
+                            Log.d(TAG, "HDMI down");
+                            playActivity.printStatus(String.format(msg, "down"));
+                            tLastHDMIUp = -1;
+                        }
+                        iMarker++;
+                        if(iMarker >= marker.length){
+                            iMarker = 0;
+                        }
+                    }
+//                    Timeout
+                    if(t > 30000 || doQuit) {
+                        break;
+                    }
+                }
+            }
+
+            public void quit(){
+                doQuit = true;
+            }
+
+            public void setMessageHandler(Handler handler){
+                this.handler = handler;
             }
         }
     }
